@@ -1,0 +1,26 @@
+# Arquivo .gitignore para o projeto Gerador de Vídeo
+
+# Ignorar pastas de ambiente virtual do Python
+# Estas pastas contêm as bibliotecas instaladas e são específicas para cada máquina.
+venv/
+.venv/
+env/
+.env/
+__pycache__/
+
+# Ignorar pastas de arquivos gerados pelo nosso aplicativo
+# Estas pastas contêm arquivos temporários, previews e os vídeos finais.
+uploads/
+output/
+previews/
+
+# Ignorar arquivos de configuração e de mídia do usuário na raiz do projeto
+# Estes arquivos são gerados e alterados durante o uso da ferramenta.
+settings.json
+preview.jpg
+user_media.*
+
+# Ignorar arquivos de cache e de sistema operacional
+# São arquivos gerados automaticamente pelo Windows, macOS ou Linux.
+.DS_Store
+Thumbs.db
