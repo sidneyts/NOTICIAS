@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Vídeo de Notícias</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        } else {
+          document.documentElement.classList.remove('dark')
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Coluna de Controles -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-2 text-center">Gerador de Vídeo</h1>
+                <p class="text-gray-500 dark:text-gray-400 mb-6 text-center">Selecione o formato e ajuste os controlos.</p>
+                
+                <div class="mb-8">
+                    <label for="formatSelector" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 text-center">Formato do Vídeo</label>
+                    <select id="formatSelector" class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="1920x1080">Widescreen (16:9)</option>
+                        <option value="1080x1920">Vertical (9:16)</option>
+                        <option value="2048x720">Cinemascope (2.84:1)</option>
+                    </select>
+                </div>
+
+                <form id="videoForm" onsubmit="event.preventDefault(); return false;">
+                    <div class="space-y-6">
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600">
+                            <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Configurações Globais</legend>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+                                <div>
+                                    <label for="framerate" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Framerate (FPS)</label>
+                                    <select id="framerate" name="framerate" class="control-input-global w-full px-4 py-2 border rounded-lg shadow-sm">
+                                        <option value="24">24 (Cinema)</option>
+                                        <option value="25">25 (PAL)</option>
+                                        <option value="30">30 (Padrão)</option>
+                                        <option value="60">60 (Alta Fluidez)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600"> <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Textos Principais (Comum)</legend> <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2"> <div> <label for="retranca" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Retranca</label> <input type="text" id="retranca" name="retranca" class="control-input-global w-full px-4 py-2 border rounded-lg shadow-sm"> </div> <div> <label for="titulo" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Título</label> <textarea id="titulo" name="titulo" rows="3" class="control-input-global w-full px-4 py-2 border rounded-lg shadow-sm"></textarea> </div> </div> </fieldset>
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600"> <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Controles da Retranca</legend> <div class="grid grid-cols-1 gap-4 mt-2"> <div class="grid grid-cols-3 gap-4"> <div> <label for="fontSizeRetranca" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Tamanho Fonte</label> <input type="number" id="fontSizeRetranca" name="fontSizeRetranca" class="control-input w-full px-4 py-2 border rounded-lg shadow-sm"> </div> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"><label for="posXRetranca" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição X</label><span id="posXRetrancaValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span></div> <input type="range" id="posXRetranca" name="posXRetranca" min="0" max="1920" step="1" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"><label for="posYRetranca" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição Y</label><span id="posYRetrancaValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span></div> <input type="range" id="posYRetranca" name="posYRetranca" min="0" max="1080" step="1" class="control-input"> </div> </div> </fieldset>
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600"> <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Controles do Título</legend> <div class="grid grid-cols-1 gap-4 mt-2"> <div class="grid grid-cols-3 gap-4"> <div><label for="fontSizeTitulo" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Tamanho Fonte</label><input type="number" id="fontSizeTitulo" name="fontSizeTitulo" class="control-input w-full px-4 py-2 border rounded-lg shadow-sm"></div> <div><label for="letterSpacingTitulo" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Espaço Letras</label><input type="number" id="letterSpacingTitulo" name="letterSpacingTitulo" class="control-input w-full px-4 py-2 border rounded-lg shadow-sm"></div> <div><label for="lineSpacingTitulo" class="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">Espaço Linhas</label><input type="number" id="lineSpacingTitulo" name="lineSpacingTitulo" class="control-input w-full px-4 py-2 border rounded-lg shadow-sm"></div> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"><label for="posXTitulo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição X</label><span id="posXTituloValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span></div> <input type="range" id="posXTitulo" name="posXTitulo" min="0" max="1920" step="1" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"><label for="posYTitulo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição Y</label><span id="posYTituloValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span></div> <input type="range" id="posYTitulo" name="posYTitulo" min="0" max="1080" step="1" class="control-input"> </div> </div> </fieldset>
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600"> <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Controles da Mídia de Fundo</legend> <div class="grid grid-cols-1 gap-4 mt-2"> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="escalaFundo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Escala</label> <span id="escalaFundoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">1.00</span> </div> <input type="range" id="escalaFundo" name="escalaFundo" min="0.5" max="3" step="0.01" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="posXFundo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição X</label> <span id="posXFundoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span> </div> <input type="range" id="posXFundo" name="posXFundo" min="-1000" max="1000" step="1" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="posYFundo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição Y</label> <span id="posYFundoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span> </div> <input type="range" id="posYFundo" name="posYFundo" min="-500" max="500" step="1" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="blurFundo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Blur</label> <span id="blurFundoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">25</span> </div> <input type="range" id="blurFundo" name="blurFundo" min="1" max="151" step="2" class="control-input"> </div> </div> </fieldset>
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600"> <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Controles da Logo (Específico)</legend> <div class="grid grid-cols-1 gap-4 mt-2"> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="escalaLogo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Escala</label> <span id="escalaLogoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">1.00</span> </div> <input type="range" id="escalaLogo" name="escalaLogo" min="0.1" max="2.0" step="0.01" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="posXLogo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição X</label> <span id="posXLogoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span> </div> <input type="range" id="posXLogo" name="posXLogo" min="0" max="1920" step="1" class="control-input"> </div> <div class="flex flex-col"> <div class="flex justify-between items-center"> <label for="posYLogo" class="text-sm font-medium text-gray-700 dark:text-gray-300">Posição Y</label> <span id="posYLogoValue" class="text-sm font-mono text-gray-500 dark:text-gray-400">0 px</span> </div> <input type="range" id="posYLogo" name="posYLogo" min="0" max="1080" step="1" class="control-input"> </div> </div> </fieldset>
+                        <fieldset class="border p-4 rounded-lg border-gray-300 dark:border-gray-600"> <legend class="text-lg font-semibold px-2 text-gray-700 dark:text-gray-300">Arquivo de Mídia</legend> <div class="flex justify-center items-center text-sm mt-2"> <div> <label for="userMedia" class="file-input-label">Mídia de Fundo</label> <input type="file" id="userMedia" class="file-input" accept="image/*,video/*"> <span id="userMediaName" class="file-name dark:text-gray-400 block text-center mt-2">Nenhum ficheiro selecionado</span> </div> </div> </fieldset>
+                    </div>
+                    <div class="mt-10"> <button type="button" id="generateBtn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:bg-green-700 transition-transform transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">Gerar Todos os Formatos</button> </div>
+                </form>
+                <div id="status" class="mt-6 text-center min-h-[2.5rem]"></div>
+            </div>
+
+            <!-- Coluna de Preview -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 flex flex-col items-center justify-center">
+                 <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Preview</h2>
+                 <div id="previewContainer" class="w-full preview-aspect-16-9 flex items-center justify-center rounded-lg overflow-hidden">
+                    <img id="previewImage" src="" alt="Preview do vídeo" class="w-full h-full object-contain hidden"/>
+                    <div id="previewPlaceholder" class="text-gray-400 dark:text-gray-500 p-4 text-center">Carregue a mídia para ver o preview</div>
+                 </div>
+                 <p id="previewStatus" class="mt-4 text-gray-500 dark:text-gray-400 text-sm h-5"></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
