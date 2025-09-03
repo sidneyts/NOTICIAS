@@ -22,7 +22,12 @@ const sliderConfig = [
     {id: 'posYFundo', valueId: 'posYFundoValue', unit: ' px', decimals: 0}, {id: 'blurFundo', valueId: 'blurFundoValue', unit: '', decimals: 0},
     {id: 'escalaLogo', valueId: 'escalaLogoValue', unit: '', decimals: 2}, {id: 'posXLogo', valueId: 'posXLogoValue', unit: ' px', decimals: 0},
     {id: 'posYLogo', valueId: 'posYLogoValue', unit: ' px', decimals: 0},
-    {id: 'paddingXBox', valueId: 'paddingXBoxValue', unit: ' px', decimals: 0}, {id: 'paddingYBox', valueId: 'paddingYBoxValue', unit: ' px', decimals: 0}
+    {id: 'paddingXBox', valueId: 'paddingXBoxValue', unit: ' px', decimals: 0}, {id: 'paddingYBox', valueId: 'paddingYBoxValue', unit: ' px', decimals: 0},
+    // NOVAS CONFIGURAÇÕES DE SLIDERS DA MÁSCARA
+    {id: 'intensidadeMascara', valueId: 'intensidadeMascaraValue', unit: '', decimals: 2},
+    {id: 'rotacaoMascara', valueId: 'rotacaoMascaraValue', unit: '°', decimals: 0},
+    {id: 'posXMascara', valueId: 'posXMascaraValue', unit: ' px', decimals: 0},
+    {id: 'posYMascara', valueId: 'posYMascaraValue', unit: ' px', decimals: 0}
 ];
 
 // --- Funções Utilitárias ---
@@ -58,7 +63,11 @@ function loadControls() {
         if (formatSettings.hasOwnProperty(input.name)) {
             input.value = formatSettings[input.name];
         } else {
-            input.value = input.defaultValue;
+            // Se o valor não estiver salvo, usa o valor padrão definido no HTML
+            const defaultValue = input.getAttribute('value');
+            if (defaultValue) {
+                 input.value = defaultValue;
+            }
         }
         if (input.type === 'range') {
             updateSliderDisplay(input.id);

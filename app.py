@@ -49,6 +49,8 @@ def overlay_image(background, overlay, x, y, scale):
     h_bg, w_bg, _ = background.shape
     overlay_bgr, overlay_alpha = overlay_resized[:, :, 0:3], overlay_resized[:, :, 3] / 255.0
     
+    x, y = int(x), int(y)
+
     x1_dest, y1_dest = max(0, x), max(0, y)
     x2_dest, y2_dest = min(w_bg, x + w_scaled), min(h_bg, y + h_scaled)
     x1_src, y1_src = max(0, -x), max(0, -y)
@@ -56,6 +58,10 @@ def overlay_image(background, overlay, x, y, scale):
     if (x2_dest - x1_dest) > 0 and (y2_dest - y1_dest) > 0:
         dest_w, dest_h = x2_dest - x1_dest, y2_dest - y1_dest
         x2_src, y2_src = x1_src + dest_w, y1_src + dest_h
+        
+        y1_dest, y2_dest, x1_dest, x2_dest = int(y1_dest), int(y2_dest), int(x1_dest), int(x2_dest)
+        y1_src, y2_src, x1_src, x2_src = int(y1_src), int(y2_src), int(x1_src), int(x2_src)
+
         roi = background[y1_dest:y2_dest, x1_dest:x2_dest]
         alpha_mask = cv2.merge([overlay_alpha[y1_src:y2_src, x1_src:x2_src]] * 3)
         bgr_src = overlay_bgr[y1_src:y2_src, x1_src:x2_src]
@@ -86,28 +92,120 @@ def wrap_text(text, font, max_width, tracking=0):
         lines.append(line.strip())
     return lines
 
+# --- NOVA FUNÇÃO PARA CRIAR A MÁSCARA DE BORDA ---
+def create_edge_fade_mask(width, height, rotation, position_offset, fade_intensity):
+    # Cria uma tela grande para evitar cortes na rotação
+    diag = int(np.sqrt(width**2 + height**2))
+    mask = np.zeros((diag, diag), dtype=np.uint8)
+    
+    # A intensidade (0 a 1) controla a largura do fade. Multiplicamos por 2 para um efeito mais visível.
+    fade_width = int(width * fade_intensity * 2)
+    if fade_width < 1: # Se a intensidade for 0, a máscara será totalmente opaca
+        mask.fill(255)
+    else:
+        # A posição (offset) move a "linha imaginária" (o centro do fade)
+        fade_center = (diag // 2) + position_offset
+        opaque_end = fade_center - (fade_width // 2)
+        
+        # --- CORREÇÃO DO ERRO ---
+        # Garante que os índices de slice sejam inteiros
+        opaque_end_int = int(opaque_end)
+        
+        # Preenche a parte totalmente opaca (branca)
+        mask[:, :max(0, opaque_end_int)] = 255
+        
+        # Cria o gradiente (branco para preto)
+        gradient_zone = np.linspace(255, 0, fade_width, dtype=np.uint8)
+        for i in range(fade_width):
+            col_index = opaque_end_int + i
+            if 0 <= col_index < diag:
+                mask[:, col_index] = gradient_zone[i]
+            
+    # Rotaciona a máscara
+    center = (diag // 2, diag // 2)
+    rot_mat = cv2.getRotationMatrix2D(center, rotation, 1.0)
+    rotated_mask = cv2.warpAffine(mask, rot_mat, (diag, diag), flags=cv2.INTER_LINEAR)
+    
+    # Corta o centro da máscara rotacionada para o tamanho da imagem original
+    crop_x = (diag - width) // 2
+    crop_y = (diag - height) // 2
+    final_mask = rotated_mask[crop_y:crop_y + height, crop_x:crop_x + width]
+    
+    return final_mask
+
 def processar_frame(frame_fundo_bgr_original, img_logo, frame_identidade_bgr, img_fade, frame_count, fps, params, final_dimensions, format_key):
     frame_width, frame_height = final_dimensions
     
+    # Camada 1: Fundo Desfocado
     bg_fill = cv2.resize(frame_fundo_bgr_original, (frame_width, frame_height), interpolation=cv2.INTER_LINEAR)
-    blur_amount = max(1, params.get('blurFundo', 25) // 2 * 2 + 1)
+    raw_blur = params.get('blurFundo', 25)
+    blur_amount = max(1, int(raw_blur))
+    if blur_amount % 2 == 0: blur_amount += 1
     canvas = cv2.GaussianBlur(bg_fill, (blur_amount, blur_amount), 0)
 
+    # Camada 2: Mídia Principal
     escala_fundo = params.get('escalaFundo', 1.0)
     h_orig, w_orig, _ = frame_fundo_bgr_original.shape
     w_scaled, h_scaled = int(w_orig * escala_fundo), int(h_orig * escala_fundo)
     if w_scaled > 0 and h_scaled > 0:
         scaled_fg = cv2.resize(frame_fundo_bgr_original, (w_scaled, h_scaled), interpolation=cv2.INTER_AREA)
+        
+        # Garante que a mídia principal tenha 4 canais (BGRA)
+        if scaled_fg.shape[2] == 3:
+            scaled_fg_rgba = cv2.cvtColor(scaled_fg, cv2.COLOR_BGR2BGRA)
+        else:
+            scaled_fg_rgba = scaled_fg
+
+        # --- LÓGICA DE MÁSCARA DE BORDA ATUALIZADA ---
+        intensidade_mascara = params.get('intensidadeMascara', 0.0)
+        # A máscara só é criada se a intensidade for maior que zero
+        if intensidade_mascara > 0:
+            rotacao = params.get('rotacaoMascara', 0.0)
+            # O slider de posição Y não é usado aqui, apenas o X
+            posicao = params.get('posXMascara', 0) 
+            
+            edge_mask = create_edge_fade_mask(w_scaled, h_scaled, rotacao, posicao, intensidade_mascara)
+            
+            b, g, r, a = cv2.split(scaled_fg_rgba)
+            # A nova máscara é mesclada com o canal alfa existente
+            # (útil se a imagem original já tiver transparência)
+            new_alpha = cv2.min(a, edge_mask)
+            scaled_fg_rgba = cv2.merge([b, g, r, new_alpha])
+
+        # Sobrepõe a mídia principal (agora com borda suave) no canvas
         offset_x = params.get('posXFundo', 0); offset_y = params.get('posYFundo', 0)
         pos_x = int((frame_width - w_scaled) / 2) + offset_x
         pos_y = int((frame_height - h_scaled) / 2) + offset_y
-        if scaled_fg.shape[2] == 3: scaled_fg = cv2.cvtColor(scaled_fg, cv2.COLOR_BGR2BGRA)
-        canvas = overlay_image(canvas, scaled_fg, pos_x, pos_y, 1.0)
-    
-    if img_fade.shape[:2] != (frame_height, frame_width): img_fade = cv2.resize(img_fade, (frame_width, frame_height))
-    fade_bgr, fade_alpha_3ch = img_fade[:, :, :3], cv2.merge([img_fade[:, :, 3] / 255.0] * 3)
-    imagem_com_fade = (cv2.multiply(canvas.astype(float), fade_bgr.astype(float), scale=1/255.0) * fade_alpha_3ch + canvas.astype(float) * (1.0 - fade_alpha_3ch)).astype(np.uint8)
+        canvas = overlay_image(canvas, scaled_fg_rgba, pos_x, pos_y, 1.0)
 
+    # Camada 3: Efeito de Vinheta (Fade) - CÓDIGO CORRIGIDO
+    if img_fade.shape[:2] != (frame_height, frame_width):
+        img_fade = cv2.resize(img_fade, (frame_width, frame_height), interpolation=cv2.INTER_AREA)
+
+    # Separa os canais da imagem de fade (BGRA)
+    fade_bgr = img_fade[:, :, :3]
+    fade_alpha = img_fade[:, :, 3]
+
+    # Normaliza as imagens para o intervalo [0, 1] para a multiplicação
+    canvas_float = canvas.astype(np.float32) / 255.0
+    fade_bgr_float = fade_bgr.astype(np.float32) / 255.0
+    fade_alpha_float = fade_alpha.astype(np.float32) / 255.0
+    
+    # Cria uma máscara de alfa com 3 canais para a mesclagem
+    alpha_mask = cv2.merge([fade_alpha_float, fade_alpha_float, fade_alpha_float])
+
+    # Executa a multiplicação (modo de mesclagem "multiply")
+    multiplied_layer = canvas_float * fade_bgr_float
+    
+    # Mescla a camada multiplicada com a original usando o alfa da vinheta
+    # Fórmula: (foreground * alpha) + (background * (1 - alpha))
+    blended_float = (multiplied_layer * alpha_mask) + (canvas_float * (1.0 - alpha_mask))
+    
+    # Converte de volta para 8-bit (0-255)
+    imagem_com_fade = (blended_float * 255.0).astype(np.uint8)
+
+
+    # Camada 4: Logo Urbnews
     if img_logo is not None:
         imagem_com_fade = overlay_image(imagem_com_fade, img_logo, params.get('posXLogo', 0), params.get('posYLogo', 0), params.get('escalaLogo', 1.0))
     
@@ -116,47 +214,22 @@ def processar_frame(frame_fundo_bgr_original, img_logo, frame_identidade_bgr, im
     font_retranca = ImageFont.truetype(params['fontPath'], int(40 * params.get('escalaRetranca', 1.0)))
     font_titulo = ImageFont.truetype(params['fontPath'], params.get('fontSizeTitulo', 85))
     
-    # --- Início da Correção do Box da Retranca ---
-    # Define o padding (margem interna) padrão
-    padding_x = 25
-    padding_y = 12
-    ajustebox = 15
+    # Camadas 5 e 6: Box da Tag e Texto da Tag
+    padding_x = 25; padding_y = 12; ajustebox = 4
+    if format_key == "800x600": padding_x = 12; padding_y = 5; ajustebox = 3
 
-    # VERIFICA SE O FORMATO É O BOX E, SE FOR, USA VALORES DE PADDING PERSONALIZADOS
-    # Você pode ajustar estes valores manualmente como quiser.
-    if format_key == "800x600":
-        padding_x = 12
-        padding_y = 5
-        ajustebox = 9
-
-    # Calcula as dimensões exatas do texto usando os métodos mais precisos da Pillow
     if hasattr(draw, 'textbbox'):
-        # textbbox retorna (esquerda, topo, direita, fundo) da caixa que contém o texto
         bbox = draw.textbbox((0, 0), params['retranca'], font=font_retranca)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-        # O (posX, posY) dos sliders refere-se ao canto superior esquerdo do texto
-        text_x = params['posXRetranca']
-        text_y = params['posYRetranca'] # - bbox[1] #Adiciona o offset do topo para um alinhamento preciso
-    else: # Fallback para versões mais antigas
-        text_width, text_height = draw.textsize(params['retranca'], font=font_retranca)
-        text_x = params['posXRetranca']
-        text_y = params['posYRetranca']
+        text_width, text_height = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    else: text_width, text_height = draw.textsize(params['retranca'], font=font_retranca)
+    text_x, text_y = params['posXRetranca'], params['posYRetranca']
     
-    # Calcula as coordenadas da caixa com base na posição do texto e no padding
-    box_x1 = text_x - padding_x
-    box_y1 = text_y - padding_y
-    box_x2 = text_x + text_width + padding_x
-    box_y2 = text_y + text_height + padding_y + ajustebox
-
-    # Desenha o retângulo branco
+    box_x1, box_y1 = text_x - padding_x, text_y - padding_y
+    box_x2, box_y2 = text_x + text_width + padding_x, text_y + text_height + padding_y + ajustebox
     draw.rectangle([(box_x1, box_y1), (box_x2, box_y2)], fill="white")
-    
-    # Desenha o texto.
     draw.text((text_x, text_y), params['retranca'], font=font_retranca, fill="#005291")
-    # --- Fim da Correção do Box da Retranca ---
 
-
+    # Camada 7: Texto do Título
     max_width = frame_width - params.get('posXTitulo', 1000) - 50
     linhas_titulo = wrap_text(params['titulo'], font_titulo, max_width, tracking=params.get('letterSpacingTitulo', 0))
     y_text = params.get('posYTitulo', 280)
@@ -167,6 +240,7 @@ def processar_frame(frame_fundo_bgr_original, img_logo, frame_identidade_bgr, im
 
     frame_com_texto = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
+    # Camada 8: Identidade Visual Animada
     if frame_identidade_bgr is not None:
         if frame_identidade_bgr.shape[:2] != (frame_height, frame_width): frame_identidade_bgr = cv2.resize(frame_identidade_bgr, (frame_width, frame_height))
         fade_start_time, fade_end_time = 3.0, 3.5
@@ -177,6 +251,7 @@ def processar_frame(frame_fundo_bgr_original, img_logo, frame_identidade_bgr, im
         return cv2.addWeighted(frame_identidade_bgr, fade_opacity, frame_com_texto, 1.0 - fade_opacity, 0)
     return frame_com_texto
 
+# (O resto do arquivo continua igual, sem alterações)
 def render_video_for_format(format_key, assets, all_params):
     try:
         format_params = all_params['formats'][format_key]
@@ -275,8 +350,9 @@ def preview_frame_endpoint():
             fade_img_path = os.path.join(ASSETS_FOLDER, assets['fade'])
             
             params.update(settings)
-            params.update(settings.get('formats', {}).get(format_key, {}))
-            params['fontPath'] = font_path
+            format_specific_settings = settings.get('formats', {}).get(format_key, {})
+            combined_params = {**format_specific_settings, **params}
+            combined_params['fontPath'] = font_path
 
             img_logo = cv2.imread(logo_img_path, cv2.IMREAD_UNCHANGED)
             img_fade = cv2.imread(fade_img_path, cv2.IMREAD_UNCHANGED)
@@ -289,11 +365,13 @@ def preview_frame_endpoint():
             else:
                 frame_fundo = cv2.imread(user_media_path)
 
-            final_frame = processar_frame(frame_fundo, img_logo, None, img_fade, 5 * fps, fps, params, final_dimensions, format_key)
+            final_frame = processar_frame(frame_fundo, img_logo, None, img_fade, 5 * fps, fps, combined_params, final_dimensions, format_key)
             
             cv2.imwrite(PREVIEW_FILE_PATH, final_frame)
             return jsonify({'previewUrl': '/static/preview.jpg'})
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"[ERRO] Preview: {e}")
             return jsonify({'error': str(e)}), 500
 
@@ -308,23 +386,24 @@ def generate_video_endpoint():
         generated_files = [res["path"] for res in base_results if "path" in res]
         derived_results = []
 
-        # Lógica de pós-produção para formatos derivados
         for result in base_results:
             if "path" not in result: continue
 
-            base_format = result["base_format"]
+            base_format_label = result.get("base_format")
+            if not base_format_label: continue
+            
             source_path = result["path"]
             
             derived_map = {
                 "WIDEFULLHD": [("WIDE", (1280, 720), 10), ("TER", (1280, 720), 15)],
-                "MUB": [("LED4", (864, 288), 10)],
+                "MUB-FOR-SP": [("LED4", (864, 288), 10)],
                 "VERTFULLHD": [("VERT", (608, 1080), 10)]
             }
 
-            if base_format in derived_map:
-                for label, dims, duration in derived_map[base_format]:
+            if base_format_label in derived_map:
+                for label, dims, duration in derived_map[base_format_label]:
                     try:
-                        new_filename = os.path.basename(source_path).replace(base_format, label)
+                        new_filename = os.path.basename(source_path).replace(base_format_label, label)
                         new_path = os.path.join(OUTPUT_FOLDER, new_filename)
                         
                         reader = cv2.VideoCapture(source_path)
@@ -341,6 +420,7 @@ def generate_video_endpoint():
                                 if not ret: break
                                 last_frame = frame
                             
+                            if last_frame is None: continue
                             resized_frame = cv2.resize(last_frame, dims, interpolation=cv2.INTER_AREA)
                             writer.write(resized_frame)
 
@@ -354,7 +434,6 @@ def generate_video_endpoint():
         all_results = base_results + derived_results
         generated_files.extend([res["path"] for res in derived_results if "path" in res])
 
-        # Criação do ficheiro ZIP
         zip_url = None
         if generated_files:
             date_str = datetime.now().strftime("%d%m%Y_%H%M")
