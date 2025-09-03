@@ -15,12 +15,14 @@ const userMediaNameSpan = document.getElementById('userMediaName');
 
 // Configuração dos sliders
 const sliderConfig = [
+    {id: 'escalaRetranca', valueId: 'escalaRetrancaValue', unit: '', decimals: 2},
     {id: 'posXRetranca', valueId: 'posXRetrancaValue', unit: ' px', decimals: 0}, {id: 'posYRetranca', valueId: 'posYRetrancaValue', unit: ' px', decimals: 0},
     {id: 'posXTitulo', valueId: 'posXTituloValue', unit: ' px', decimals: 0}, {id: 'posYTitulo', valueId: 'posYTituloValue', unit: ' px', decimals: 0},
     {id: 'escalaFundo', valueId: 'escalaFundoValue', unit: '', decimals: 2}, {id: 'posXFundo', valueId: 'posXFundoValue', unit: ' px', decimals: 0},
     {id: 'posYFundo', valueId: 'posYFundoValue', unit: ' px', decimals: 0}, {id: 'blurFundo', valueId: 'blurFundoValue', unit: '', decimals: 0},
     {id: 'escalaLogo', valueId: 'escalaLogoValue', unit: '', decimals: 2}, {id: 'posXLogo', valueId: 'posXLogoValue', unit: ' px', decimals: 0},
-    {id: 'posYLogo', valueId: 'posYLogoValue', unit: ' px', decimals: 0}
+    {id: 'posYLogo', valueId: 'posYLogoValue', unit: ' px', decimals: 0},
+    {id: 'paddingXBox', valueId: 'paddingXBoxValue', unit: ' px', decimals: 0}, {id: 'paddingYBox', valueId: 'paddingYBoxValue', unit: ' px', decimals: 0}
 ];
 
 // --- Funções Utilitárias ---
@@ -46,29 +48,38 @@ function updateSliderDisplay(sliderId) {
 }
 
 function loadControls() {
-    // Carrega controlos globais
     document.getElementById('framerate').value = fullSettings.framerate || 30;
     document.getElementById('retranca').value = fullSettings.retranca || '';
     document.getElementById('titulo').value = fullSettings.titulo || '';
     
-    // Carrega controlos específicos do formato
-    const formatSettings = fullSettings.formats[currentFormat];
-    if (!formatSettings) return;
+    const formatSettings = fullSettings.formats[currentFormat] || {};
 
     document.querySelectorAll('.control-input').forEach(input => {
         if (formatSettings.hasOwnProperty(input.name)) {
             input.value = formatSettings[input.name];
-            if (input.type === 'range') {
-                updateSliderDisplay(input.id);
-            }
+        } else {
+            input.value = input.defaultValue;
+        }
+        if (input.type === 'range') {
+            updateSliderDisplay(input.id);
         }
     });
 }
 
 function updateUIAfterFormatChange() {
-    let aspectClass = 'preview-aspect-16-9'; // Padrão
+    // Mostra/esconde os controlos de padding do Box
+    const boxPaddingControls = document.getElementById('box-padding-controls');
+    if (currentFormat === '800x600') {
+        boxPaddingControls.classList.remove('hidden');
+    } else {
+        boxPaddingControls.classList.add('hidden');
+    }
+
+    let aspectClass = 'preview-aspect-16-9';
     if (currentFormat === '1080x1920') aspectClass = 'preview-aspect-9-16';
     if (currentFormat === '2048x720') aspectClass = 'preview-aspect-cinema';
+    if (currentFormat === '800x600') aspectClass = 'preview-aspect-box';
+    if (currentFormat === '960x1344') aspectClass = 'preview-aspect-abrigo';
     previewContainer.className = `w-full flex items-center justify-center rounded-lg overflow-hidden ${aspectClass}`;
 
     const [maxX, maxY] = currentFormat.split('x').map(Number);
@@ -78,12 +89,9 @@ function updateUIAfterFormatChange() {
 
 // --- Funções de Lógica de Dados ---
 function saveControls() {
-    // Salva controlos globais
     fullSettings.framerate = Number(document.getElementById('framerate').value);
     fullSettings.retranca = document.getElementById('retranca').value;
     fullSettings.titulo = document.getElementById('titulo').value;
-    
-    // Salva controlos específicos do formato
     if (!fullSettings.formats) fullSettings.formats = {};
     if (!fullSettings.formats[currentFormat]) fullSettings.formats[currentFormat] = {};
     document.querySelectorAll('.control-input').forEach(input => {
@@ -109,10 +117,7 @@ async function updatePreview() {
     
     const formData = new FormData(form);
     formData.append('format', currentFormat);
-    // Adiciona os controlos globais ao FormData para o preview
-    document.querySelectorAll('.control-input-global').forEach(input => {
-        formData.append(input.name, input.value);
-    });
+    document.querySelectorAll('.control-input-global').forEach(input => formData.append(input.name, input.value));
 
     try {
         const response = await fetch('/preview-frame', {method: 'POST', body: formData});
@@ -143,9 +148,7 @@ window.addEventListener('load', async () => {
         fullSettings = await response.json();
         isMediaUploaded = !!fullSettings.userMediaFilename;
         
-        if(isMediaUploaded) {
-            userMediaNameSpan.textContent = fullSettings.userMediaOriginalFilename || fullSettings.userMediaFilename;
-        }
+        if(isMediaUploaded) userMediaNameSpan.textContent = fullSettings.userMediaOriginalFilename || fullSettings.userMediaFilename;
 
         currentFormat = fullSettings.selectedFormat || '1920x1080';
         formatSelector.value = currentFormat;
@@ -153,9 +156,7 @@ window.addEventListener('load', async () => {
         updateUIAfterFormatChange();
         loadControls();
         
-        if (isMediaUploaded) {
-            updatePreview();
-        }
+        if (isMediaUploaded) updatePreview();
 
     } catch (e) {
         console.error("Falha ao carregar a aplicação:", e);
@@ -166,6 +167,67 @@ window.addEventListener('load', async () => {
         input.addEventListener('input', debouncedUpdate);
         if (input.type === 'range') {
             input.addEventListener('input', () => updateSliderDisplay(input.id));
+        }
+    });
+
+    // Lógica para secções retráteis
+    document.querySelectorAll('.collapsible-trigger').forEach(trigger => {
+        const content = trigger.nextElementSibling;
+        const icon = trigger.querySelector('.collapsible-icon');
+        const sectionId = trigger.parentElement.dataset.sectionId;
+
+        if (localStorage.getItem(sectionId) === 'closed') {
+            content.classList.remove('open');
+            icon.classList.remove('open');
+            trigger.classList.remove('open');
+        } else {
+            content.classList.add('open');
+            icon.classList.add('open');
+            trigger.classList.add('open');
+        }
+
+        trigger.addEventListener('click', () => {
+            content.classList.toggle('open');
+            icon.classList.toggle('open');
+            trigger.classList.toggle('open');
+            localStorage.setItem(sectionId, content.classList.contains('open') ? 'open' : 'closed');
+        });
+    });
+
+    // Lógica para painel redimensionável
+    const handle = document.getElementById('preview-divider');
+    const controlsPanel = document.getElementById('controls-panel');
+    const mainContainer = document.getElementById('main-container');
+    let isResizing = false;
+
+    const savedWidth = localStorage.getItem('controlsPanelWidth');
+    if (savedWidth) {
+        controlsPanel.style.width = savedWidth;
+    }
+
+    handle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const containerRect = mainContainer.getBoundingClientRect();
+        const newWidth = e.clientX - containerRect.left;
+        const minWidth = 450; 
+        const maxWidth = containerRect.width - 300; 
+        if (newWidth > minWidth && newWidth < maxWidth) {
+            controlsPanel.style.width = `${newWidth}px`;
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+            localStorage.setItem('controlsPanelWidth', controlsPanel.style.width);
         }
     });
 });
@@ -226,14 +288,21 @@ generateBtn.addEventListener('click', async function() {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error);
         
-        let downloadLinksHTML = '<div class="space-y-2">';
+        let downloadLinksHTML = '<div class="space-y-3">';
+        
         result.downloadUrls.forEach(item => {
             if(item.error) {
-                downloadLinksHTML += `<p class="text-red-500">Falha ao gerar ${item.label}</p>`;
+                downloadLinksHTML += `<p class="text-red-500 font-semibold">Falha ao gerar ${item.label}</p>`;
             } else {
-                downloadLinksHTML += `<a href="${item.url}" target="_blank" class="block bg-purple-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-purple-700 transition">Download ${item.label}</a>`;
+                downloadLinksHTML += `<a href="${item.url}" target="_blank" class="block bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition">Download ${item.label}</a>`;
             }
         });
+
+        if (result.zipUrl) {
+            downloadLinksHTML += `<hr class="my-4 border-gray-300 dark:border-gray-600">`;
+            downloadLinksHTML += `<a href="${result.zipUrl}" target="_blank" class="block bg-[#005291] text-white font-bold py-3 px-4 rounded-lg hover:bg-[#003c6b] transition text-lg">Descarregar Todos (.zip)</a>`;
+        }
+        
         downloadLinksHTML += '</div>';
         statusDiv.innerHTML = downloadLinksHTML;
 

@@ -8,14 +8,14 @@ body {
     display: block; 
     padding: 0.75rem 1.25rem; 
     border-radius: 0.5rem; 
-    background-color: #4f46e5; 
+    background-color: #005291; 
     color: white; 
     cursor: pointer; 
     text-align: center; 
     transition: background-color 0.2s; 
 }
 .file-input-label:hover { 
-    background-color: #4338ca; 
+    background-color: #003c6b; 
 }
 .file-input { 
     display: none; /* Esconde o input de ficheiro padrão */
@@ -33,19 +33,12 @@ body {
 }
 
 /* Classes de proporção (aspect ratio) para o preview */
-.preview-aspect-16-9 { 
-    aspect-ratio: 16 / 9; 
-    width: 100%; 
-}
-.preview-aspect-9-16 { 
-    aspect-ratio: 9 / 16; 
-    width: 56.25%; 
-    margin: 0 auto; 
-}
-.preview-aspect-cinema {
-    aspect-ratio: 2048 / 720;
-    width: 100%;
-}
+.preview-aspect-16-9 { aspect-ratio: 16 / 9; width: 100%; }
+.preview-aspect-9-16 { aspect-ratio: 9 / 16; width: 56.25%; margin: 0 auto; }
+.preview-aspect-cinema { aspect-ratio: 2048 / 720; width: 100%; }
+.preview-aspect-box { aspect-ratio: 800 / 600; width: 75%; margin: 0 auto; }
+.preview-aspect-abrigo { aspect-ratio: 960 / 1344; width: 56.25%; margin: 0 auto; }
+
 
 /* Estilização base para os sliders (inputs do tipo range) */
 input[type=range] { 
@@ -61,7 +54,7 @@ input[type=range]::-webkit-slider-thumb {
     height: 16px; 
     width: 16px; 
     border-radius: 50%; 
-    background: #4f46e5; 
+    background: #005291; 
     cursor: pointer; 
     margin-top: -6px; 
 }
@@ -71,7 +64,7 @@ input[type=range]::-moz-range-thumb {
     height: 16px; 
     width: 16px; 
     border-radius: 50%; 
-    background: #4f46e5; 
+    background: #005291; 
     cursor: pointer; 
     border: none; 
 }
@@ -88,15 +81,120 @@ input[type=range]::-webkit-slider-runnable-track {
     background: #4b5563; 
 }
 
-/* Estilos para inputs de texto e textarea para modo escuro */
-.control-input, .control-input-global {
-    border-color: #d1d5db; /* cinza-300 */
-    background-color: #ffffff; /* branco */
-    color: #111827; /* cinza-900 */
+/* Estilos para inputs e selects para modo escuro */
+.control-input, .control-input-global, select {
+    border-color: #d1d5db;
+    background-color: #ffffff;
+    color: #111827;
 }
-.dark .control-input, .dark .control-input-global {
-    border-color: #4b5563; /* cinza-600 */
-    background-color: #374151; /* cinza-700 */
-    color: #f9fafb; /* cinza-50 */
+.dark .control-input, .dark .control-input-global, .dark select {
+    border-color: #4b5563;
+    background-color: #374151;
+    color: #f9fafb;
+}
+
+/* Estilos para legendas de fieldset e labels */
+legend, label {
+    color: #374151; /* cinza-700 */
+}
+.dark legend, .dark label {
+    color: #d1d5db; /* cinza-300 */
+}
+.text-sm.font-mono {
+    color: #6b7280; /* cinza-500 */
+}
+.dark .text-sm.font-mono {
+    color: #9ca3af; /* cinza-400 */
+}
+
+/* --- Estilos para Secções Retráteis --- */
+.collapsible-trigger {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: transparent;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-align: left;
+}
+.dark .collapsible-trigger {
+    border-color: #4b5563;
+}
+.collapsible-trigger:hover legend {
+    color: #005291;
+}
+.dark .collapsible-trigger:hover legend {
+    color: #60a5fa;
+}
+.collapsible-trigger legend {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+.collapsible-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out, border 0.4s ease-in-out;
+    padding: 0 1rem;
+    border: 1px solid transparent;
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+}
+.collapsible-content.open {
+    max-height: 1000px;
+    padding: 1rem;
+    border-color: #d1d5db;
+}
+.dark .collapsible-content.open {
+    border-color: #4b5563;
+}
+.collapsible-trigger.open {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.collapsible-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    transition: transform 0.3s ease;
+}
+.collapsible-icon.open {
+    transform: rotate(180deg);
+}
+
+/* --- Estilos para Painel Redimensionável --- */
+#main-container {
+    display: flex;
+    gap: 1rem;
+    height: calc(100vh - 150px); /* Ajusta a altura para preencher a tela */
+}
+
+#controls-panel {
+    flex-shrink: 0; /* Impede que o painel de controlos encolha */
+    min-width: 450px;
+    max-width: 75%;
+}
+
+#preview-panel {
+    flex-grow: 1; /* Permite que o painel de preview cresça para preencher o espaço */
+    min-width: 300px;
+}
+
+#resize-handle {
+    width: 8px;
+    background-color: #e5e7eb;
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background-color 0.2s;
+}
+#resize-handle:hover {
+    background-color: #005291;
+}
+.dark #resize-handle {
+    background-color: #374151;
+}
+.dark #resize-handle:hover {
+    background-color: #60a5fa;
 }
 
